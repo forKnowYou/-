@@ -322,6 +322,7 @@ Python 的库应将 demo 和库分开.<br>
 为了方便迭代, 明确 main.c 文件的作用是只做常见的配置和各个模块之间的连接, 不做主要工作流程, 主要工作流程应当独立在其他c文件中执行, 由main文件调用.<br>
 (以下内容为推荐写法, 不强制)<br>
 所有能够进行 IAP 操作的 MCU (例如OLED的5.5寸屏stm32更新驱动)在设计迭代产品更新固件的方法时都应使用 IAP 的方式. (或者其他类似于一键载入, 选择串口后下载的方式)<br>
+<br>
 所有可能需要对象的模块需要使用结构体来抽象对象.<br>
 <br>
 例:<br>
@@ -348,7 +349,7 @@ void Module_init(sModule_t *psModule);
 
 ## 版本
 
--version v0.0.1
--date 2018-12-6
--author xiaowo
--remark first version
+-version v0.0.1<br>
+-date 2018-12-6<br>
+-author xiaowo<br>
+-remark first version<br>

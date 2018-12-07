@@ -69,12 +69,14 @@ typedef uint16_t color_t;
 ```
 
 普通变量(除结构体、共用体、枚举、重定义变量、指针外)的命名应遵循驼峰命名法, 专有名词应缩写.<br>
-给模块用的变量, 变量前应加上模块的前缀和下划线.<br>
+给模块用的变量, 变量前应加上模块的前缀和下划线. 下划线应当在需要分类变量时使用.<br>
 <br>
 例:<br>
 ```c++
 int lineWidth; // 普通变量
 int SPI_speed; // 给 SPI 模块用的变量, 这里如果写为 SPISpeed, 与类名的命名规则重复.
+int father_child1_child2;
+int father_child1_child3;
 ```
 
 结构体、共用体、枚举变量的创建应结合 typedef. 并在首字母前添加标识 s(struct), u(union), e(enum), 标识后的变量名首字母大写并遵循驼峰命名法.<br>
@@ -287,7 +289,7 @@ uint16_t readObj16()
   return objName;
 }
 ```
-例:想要读取目标模块中一段相邻的8位、16位、24位、16位数据.<br>
+例:想要读取目标模块中一段相邻的8位、16位、24位、16位数据. 注意, 禁止在有指针的结构体中将指针指向临时变量.<br>
 ```c++
 typedef struct {
   uint8_t     v1;

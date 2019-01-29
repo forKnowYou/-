@@ -1,10 +1,15 @@
 # 编程规范
 
-C语言和Python、Arduino封库编程规范, 编写库的时候应该在满足功能的前提下尽可能采用让人易读易懂的编写方式.
+C语言 Arduino封库编程规范
 
 ## 索引
-* [变量及函数](#变量及函数)
+* [简介](#简介)
+* [变量及函数命名](#变量及函数命名)
 * [宏](#宏)
+* [结构体](#结构体)
+* [共用体](#共用体)
+* [枚举](#枚举)
+* [指针](#指针)
 * [类](#类)
 * [缩进](#缩进)
 * [{}](#{})
@@ -13,156 +18,147 @@ C语言和Python、Arduino封库编程规范, 编写库的时候应该在满足�
 * [运算符](#运算符)
 * [Readme中多个参数函数写法](#readme中多个参数函数写法)
 * [ino文件头部写法](#ino文件头部写法)
-* [封库其他注意事项](#封库其他注意事项)
-* [套件类例程](#套件类例程)
-* [Python](#Python)
-* [C应用驱动](#C应用驱动)
-* [版本](#版本)
 
 ## 变量及函数
 
-在文件中所有有具体意义的常量应使用宏表示.<br>
-所有类中的函数遵循驼峰命名法.<br>
-类之外的函数名前面应当加上模块前缀.<br>
-<br>
+*首字母小写, 下个单词首字母大写 <br>
+*专有名词要大写
 
-对于变量的使用限制:<br>
-尽量避免大的临时变量和全局变量的创建, 在需要大型 buffer 的情况下, 需要思考这个 buffer 是否可以拆分.<br>
-比如有一个统计总线上 IIC 设备个数和地址的函数, 不应在全局变量中创建一个 125 字节的 buffer 存储所有可能的地址, 而应采用如下的结构.<br>
-```c++
-class DFRobot_ScanIIC
+正确的写法
+
+```C++
+int sensorValue;
+int SDCard,IIS,I2C;
+```
+
+错误的写法
+
+```C++
+int sensor_value;
+float sensorvalue;
+byte sensor_Value;
+```
+
+为了各个库之间的互相兼容，必须做到以下几点。<br>
+
+  1. 库的 cpp 文件中除个别情况外不能有全局变量，所有相关变量应定义在 class 中
+  2. 库相关的变量定义要么定义在 class 中，要么加上库名作为前缀
+  3. 所有有特殊需求的外设通信（比如说要把IIC通信速率提高到800KHZ），在每次开始通信前必须进行相关配置，通信完成后必须把更改了的配置恢复到默认状态
+
+例: <br>
+
+.h 文件:
+
+```cpp
+
+#define MODULE_OK   0
+#define MODULE_ERR  -1
+
+typedef enum {
+  eModuleStatusOK,
+  eModuleStatusErr = -1
+} eModuleStatus_t;
+
+class DFRobot_Module {
+
+  typedef enum {
+    eOK,
+    eERR
+  } eStatus_t;
+
+  eStatus_t writeReg(uint8_t reg, uint8_t *pBuf, uint16_t len);
+
+}
+```
+
+.cpp 文件:
+
+```cpp
+
+DFRobot_Module::eStatus_t DFRobot_Module::writeReg(uint8_t reg, uint8_t *pBuf, uint16_t len)
 {
-  public:
-    uint8_t scan();     // 每次调用 scan 便从 _scanMask 开始扫描, 每发现一个 IIC 设备便返回该设备的地址并将 _scanMask 赋值为该设备地址, _count 加一, 直到扫描到地址 0x7f
-    uint8_t reset();    // 重置
-    bool isCompelete(); // 返回 _compelete
-    ...                 // 其他函数
-  protected:
-    uint8_t _scanMask = 0, _count = 0;
-    bool _compelete = false;
-};
-
-// 在 ino 中提示用法
-
-DFRobot_ScanIIC scan();
-
-void setup()
-{
-  uint8_t currentAddr = scan.scan();
-  Serial.begin(115200);
-  while(scan.isCompelete() != true) {
-    uint8_t addr = scan.scan();
-    if(addr) {
-      Serial.print("scan addr: ");
-      Serial.println(addr);
-    }
-  }
+  SPI.begin(SPISettings(32000000, MSBFIRST, SPI_MODE0));  // 特殊设定
+  // do something
+  SPI.begin(SPISettings(14000000, MSBFIRST, SPI_MODE0));  // 恢复默认设定
 }
 
 ```
 
-使用 typedef 重定义的变量应加上后缀 _t .<br>
-<br>
-例:<br>
-```c++
-typedef uint16_t color_t;
-```
-
-普通变量(除结构体、共用体、枚举、重定义变量、指针外)的命名应遵循驼峰命名法, 专有名词应缩写.<br>
-给模块用的变量, 变量前应加上模块的前缀和下划线. 下划线应当在需要分类变量时使用.<br>
-<br>
-例:<br>
-```c++
-int lineWidth; // 普通变量
-int SPI_speed; // 给 SPI 模块用的变量, 这里如果写为 SPISpeed, 与类名的命名规则重复.
-int father_child1_child2;
-int father_child1_child3;
-```
-
-结构体、共用体、枚举变量的定义应结合 typedef. 并在首字母前添加标识 s(struct), u(union), e(enum), 标识后的变量名首字母大写并遵循驼峰命名法.<br>
-结构体、共用体的创建应直接使用结构体名称除去末尾的 _t 作为变量名.
-<br>
-例:<br>
-```c++
-typedef struct {
-  int var1;
-} sStruct_t;
-
-sStruct_t sStruct;
-sStruct_t sStruct_class1;
-sStruct_t sStruct_class2;
-
-// 由于 struct, union, ecum 是独立于 class 的, 所以大多数情况下应当在定义时加上模块缩写和下划线, 下划线后的内容遵循驼峰命名法
-
-typedef struct {
-  int var1;
-} sDFModule_struct_t;
-
-typedef union {
-  int i;
-  char ch[4];
-} uUnion_t;
-
-uUnion_t uUnion;
-uUnion_t uUnion_class1;
-uUnion_t uUnion_class2;
-
-// 由于枚举变量也是一个常量, 所以枚举值应当像宏定义一样基本所有字母都大写
-
-typedef enum {
-  eENUM1;
-} eEnum_t;
-```
-
-指针变量在命名时应当在命名前加上 p. 多级指针应当有同数量个 p. * 号应当在变量前面<br>
-<br>
-例:<br>
-```c++
-int *pVar1, *pVar2;
-int **ppVar1;
-
-// 对于结构体、联合体指针, 应除了后缀 _t 之外保留其他字符
-sStruct_t *psStruct;
-```
-
-函数指针变量应在开始加上 pf + 模块缩写 指明函数指针.<br>
-<br>
-例:<br>
-```c++
-typedef void (*pfModule_foo_t)();
-```
-
-为了防止子类在编写函数时传入的参数名和父类中的变量名冲突。<br>
-类中的所有变量都应以下划线开始并在下划线后遵循驼峰命名法。<br>
-<br>
-例:<br>
-```c++
-class DFRobot_XXXX
-{
-  public:
-    void foo(uint16_t var); // 
-  protected:
-    uint16_t _var; // 避免命名冲突
-};
-
-class DFRobot_child : public DFRobot_XXXX
-{
-  public:
-    void foo1(uint16_t var);
-};
-```
-
 ## 宏
 
-所有字母都要大写, 所有的带参宏必须加完全的括号. (类似于函数用法的宏例外并不用所有字母大写)<br>
-<br>
-例:<br>
-```c++
-#define AA          1000
+作为简化记忆功能的宏所有字母都要大写
+正确的写法
+```C++
+#define MAX 1000
+#define SENSOR_REG1 1
+```
 
+错误的写法：
+```C++
+#define Max 1000
+#define sensorReg1 1
+```
+带参数的宏,参数要加括号
+```C++
 #define ADD(x, y)   ((x) + (y))
+```
+类似函数用法的宏，采用函数的编程规范
+```C++
+#define swapInt(a, b)  { int c = b; a = b; b = c; }
+```
+## 结构体
 
-#define swap_int(a, b)  { int c = b; a = b; b = c; }
+使用typedef，前面要加s，后面首字母大写
+
+```C++
+typedef struct
+{
+  int age;
+  char name[20];
+}sTeacher_t;
+```
+
+## 共用体
+
+使用typedef，前面要加u，后面首字母大写
+
+```C++
+typedef union {
+  uint32_t value;
+  uint8_t b[4];
+} uValue_t;
+```
+
+## 枚举
+
+前面要加e，后面首字母大写
+```C++
+typedef enum{
+  eSunday=0,
+  eMonday,
+  eTuesday,
+  eWednesday,
+  eThursday,
+  eFriday,
+  eSaturday,
+}eDay_t;
+```
+## 指针
+
+指针前面要加 * 显式说明这是一个指针
+
+```C++
+int *pVar1, *pVar2;
+int **ppVar3;
+sTeacher_t *psTeacher,*psT1,*psT2;
+uValue_t *puValue,*puV1,*puV2;
+eDay_t *peDay, *peD, *peD1,*peD2;
+```
+
+指向函数的指针，使用pf做前缀
+
+```C++
+typedef void (*pfTeacherWork_t)();
 ```
 
 ## 类
@@ -179,6 +175,19 @@ class DFRobot_Lora;
 class DFRobot_sim7000;
 class Lora;
 class DFRobotLora;
+```
+成员变量要加 _ 前缀
+
+```C++
+class DFRobot_BME280
+{
+public:
+  DFRobot_BME280(int addr)
+    :_addr(addr)
+    {}
+private:
+  int _addr;
+}
 ```
 
 ## 缩进
@@ -263,104 +272,3 @@ for(int x = 0; x <= 10; x++)
   * date  2017-10-9
   */
   ```
-
-## 封库其他注意事项
-
-封库应当尽量避免使用定时器和注意外设和其他库联合使用时的冲突, 在条件允许的情况下应做外设状态检查, 在外设使用前重新配置外设, 使用完成后恢复外设状态. 如果一定要使用定时器这种敏感外设, 必须在相关文件里说明.<br>
-<br>
-以下建议用作减少阅读理解难度.<br>
-在封库的类中, 需要将类的主要逻辑放入类中, 它的通信方式使用另一个子类(这个子类如果代码量不多, 可以和父类放在用一个文件中)来实现.<br>
-<br>
-例:<br>
-```c++
-class DFRobot_BME680 {
-  protected:
-    virtual void writeReg(uint8_t reg, uint8_t data) = 0;  // 这里使用虚函数, 让子类来实现具体寄存器操作
-}
-
-class DFRobot_BME680_SPI : public DFRobot_BME680 {
-  protected:
-    void writeReg(uint8_t reg, uint8_t data);  // 重写父类的虚函数, 实现寄存器操作
-}
-```
-
-如果在MCU和目标模块大小端模式一样, 在传输数据时, 如果能明确知道传输数据的意义, 直接使用相匹配的数据类型来读取数据, 不使用以字节为单位的 buffer.<br>
-<br>
-例:想要读目标模块中一段16位的数据<br>
-```c++
-void readBytes(uint8_t addr, uint8_t reg, uint8_t *pBuf, uint8_t len);
-
-uint16_t readObj16()
-{
-  uint16_t objName = 0;
-  readBytes(addr, reg, (uint8_t*) &objName, sizeof(objName));
-  objName >>= objOffset;  // 可能需要的数据移位
-  return objName;
-}
-```
-例:想要读取目标模块中一段相邻的8位、16位、24位、16位数据. 注意, 禁止在有指针的结构体中将指针指向临时变量.<br>
-```c++
-typedef struct {
-  uint8_t     v1;
-  uint16_t    v2;
-  uint8_t     v3[3];
-  uint16_t    v4;
-} sModule_t;
-
-void readBytes(uint8_t addr, uint8_t reg, uint8_t *pBuf, uint8_t len);
-
-sModule_t readObj()  // 在使用返回的结构体进行逻辑处理时需要注意到 v3 是一个 buffer, 暂时未想到其他方式规避
-{
-  sModule_t sModule;
-  readBytes(addr, reg, (uint8_t*) &sModule, sizeof(sModule));
-  return sModule;
-}
-```
-
-## 套件类例程
-
-例如浇花套件.<br>
-为了方便迭代, 明确 ino 文件的作用是只做常见的配置和各个模块之间的连接, 不做主要工作流程, 主要工作流程应当独立在其他cpp文件中执行, 由 ino 文件调用.
-
-## Python
-
-Python 的库应将 demo 和库分开.<br>
-类名需要与遵循与 Arduino 一致的原则, 类中的变量如果不会暴露给用户, 则需要在变量名前加下划线, 同样遵循驼峰命名法.<br>
-函数名如果不暴露给用户, 则也需要在函数名前加下划线.
-
-## C应用驱动
-
-为了方便迭代, 明确 main.c 文件的作用是只做常见的配置和各个模块之间的连接, 不做主要工作流程, 主要工作流程应当独立在其他c文件中执行, 由main文件调用.<br>
-(以下内容为推荐写法, 不强制)<br>
-所有能够进行 IAP 操作的 MCU (例如OLED的5.5寸屏stm32更新驱动)在设计迭代产品更新固件的方法时都应使用 IAP 的方式. (或者其他类似于一键载入, 选择串口后下载的方式)<br>
-<br>
-所有可能需要对象的模块需要使用结构体来抽象对象.<br>
-<br>
-例:<br>
-```c++
-typedef struct {
-  int var1;
-} sModule_t;
-
-void Module_init(sModule_t *psModule, ...); // 传入对象的变量和其他初始化参数
-```
-所有模块应将能抽象的部分(比如SPI通信, IO操作等)进行函数指针抽象. 模块的主要 C 文件只包含逻辑控制.<br>
-<br>
-例:<br>
-```c++
-typedef void (*pfTransfer_t)(uint8_t addr, uint8_t reg, uint8_t *pBuf, uint8_t len);
-
-typedef struct {
-  pfTransfer_t pfRead;
-  pfTransfer_t pfWrite;
-} sModule_t;
-
-void Module_init(sModule_t *psModule);
-```
-
-## 版本
-
--version v0.0.1<br>
--date 2018-12-6<br>
--author xiaowo<br>
--remark first version<br>

@@ -1,9 +1,10 @@
 # 编程规范
 
-C语言 Arduino封库编程规范
+C语言 Arduino封库编程规范 <br>
+
+注意：所有的库严禁 copy , 所有的库首次编写时完全靠个人对技术手册的理解，遇到问题解决不了后才能参考别人的代码（必须理解人家的代码然后按照自己的理解解决问题）
 
 ## 索引
-* [简介](#简介)
 * [变量及函数命名](#变量及函数命名)
 * [宏](#宏)
 * [结构体](#结构体)
@@ -18,17 +19,20 @@ C语言 Arduino封库编程规范
 * [运算符](#运算符)
 * [Readme中多个参数函数写法](#readme中多个参数函数写法)
 * [ino文件头部写法](#ino文件头部写法)
+* [高质量封库细节](#高质量封库细节)
 
 ## 变量及函数命名
 
 *首字母小写, 下个单词首字母大写 <br>
-*专有名词要大写
+*专有名词首所有字母大写
+*有两个专有名词连读的，专有名词首字母大写即可
 
 正确的写法
 
 ```C++
 int sensorValue;
 int SDCard,IIS,I2C;
+int SdSpiSetting;
 ```
 
 错误的写法
@@ -37,6 +41,7 @@ int SDCard,IIS,I2C;
 int sensor_value;
 float sensorvalue;
 byte sensor_Value;
+int SDSPISetting;
 ```
 
 为了各个库之间的互相兼容，必须做到以下几点。<br>
@@ -272,3 +277,51 @@ for(int x = 0; x <= 10; x++)
   * date  2017-10-9
   */
   ```
+
+## 高质量封库细节
+
+1. 兼容性好（兼容 uno, leonador, mega2560, esp8266, esp32)
+2. 兼容旧版 arduino （不强制）
+3. 与其他库兼容好，参考[变量及函数命名](#变量及函数命名)
+4. 库中的便于理解的注释充足
+5. 正常情况下不使用 malloc 函数和 new 关键字，库有使用大的 buffer 的情况依据平台定义大的静态 buffer 或想办法优化
+6. 代码使用的 ram 尽量少，使用的 rom 不能太多
+7. 对于传感器中寄存器的每一个位，必须使用联合体进行定义 <br>
+例:
+```cpp
+
+typedef union {
+  struct bits {
+    uint8_t   power: 1;
+    uint8_t   trig: 1;
+    uint8_t   reversed: 6;
+  };
+  uint8_t reg;
+} uModuleConfig_t;
+
+#define writeRegBits(reg, buf, bits, value) \
+  readReg((reg), (uint8_t*) &buf, sizeof(buf)); \
+  (bits) = (value); \
+  writeReg((reg), (uint8_t*) &buf, sizeof(buf))
+
+void setPowerOn()
+{
+  uModuleConfig_t   uConf;
+  writeRegBits(MODULE_REG_CONF, uConf, uConf.bits.power, eModulePowerOn);
+}
+
+```
+8. 代码功能设置合理，初级 demo（小白用户上手测试文件）用户体验好，中高级 demo （非小白用户）用户体验尽量好
+9. 代码易于升级维护
+10. 所有的类必须逻辑与接口实现分离，接口的外设类需由用户传入，不允许直接使用 Wire，SPI 等类 <br>
+例：
+```cpp
+
+class DFRobot_Module_I2C : public DFRobot_Module {
+public:
+  DFRobot_Module_I2C(Wire *pWire) { _pWire = pWire; }
+
+  Wire    *_pWire;
+}
+
+```

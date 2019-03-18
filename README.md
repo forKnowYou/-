@@ -5,6 +5,8 @@ C语言 Arduino封库编程规范 <br>
 注意：所有的库严禁 copy , 所有的库首次编写时完全靠个人对技术手册的理解，遇到问题解决不了后才能参考别人的代码（必须理解人家的代码然后按照自己的理解解决问题）
 
 ## 索引
+
+* [参考库](#参考库)
 * [变量及函数命名](#变量及函数命名)
 * [宏](#宏)
 * [结构体](#结构体)
@@ -20,6 +22,10 @@ C语言 Arduino封库编程规范 <br>
 * [Readme中多个参数函数写法](#readme中多个参数函数写法)
 * [ino文件头部写法](#ino文件头部写法)
 * [高质量封库细节](#高质量封库细节)
+
+## 参考库
+
+https://github.com/DFRobot/DFRobot_BMP280 <br>
 
 ## 变量及函数命名
 
@@ -283,31 +289,37 @@ for(int x = 0; x <= 10; x++)
 1. 兼容性好（兼容 uno, leonardo, mega2560, esp8266, esp32)
 2. 兼容旧版 arduino （不强制）
 3. 与其他库兼容好，参考[变量及函数命名](#变量及函数命名)
-4. 库中的便于理解的注释充足
+4. 库和 demo 中的便于理解的注释充足
 5. 正常情况下不使用 malloc 函数和 new 关键字，库有使用大的 buffer 的情况依据平台定义大的静态 buffer 或想办法优化
 6. 代码使用的 ram 尽量少，使用的 rom 不能太多
-7. 对于传感器中寄存器的每一个位，必须使用联合体进行定义 <br>
+7. 对于传感器中寄存器的每一个位，必须使用结构体进行定义 <br>
 例:
 ```cpp
 
-typedef union {
-  struct bits {
-    uint8_t   power: 1;
-    uint8_t   trig: 1;
-    uint8_t   reversed: 6;
-  };
-  uint8_t reg;
-} uModuleConfig_t;
+// .h 文件定义在类中
+typedef struct {
+  uint8_t   power: 1;
+  uint8_t   trig: 1;
+  uint8_t   reversed: 2;
+  uint8_t   mode: 2;
+} sRegConfig_t;
 
-#define writeRegBits(reg, buf, bits, value) \
-  readReg((reg), (uint8_t*) &buf, sizeof(buf)); \
-  (bits) = (value); \
-  writeReg((reg), (uint8_t*) &buf, sizeof(buf))
+// .cpp 文件中的使用
 
-void setPowerOn()
+void DFRobot_Module::writeRegBits(uint8_t reg, uint8_t field, uint8_t val)
 {
-  uModuleConfig_t   uConf;
-  writeRegBits(MODULE_REG_CONF, uConf, uConf.bits.power, eModulePowerOn);
+  uint8_t   temp;
+  readReg(reg, (uint8_t*) &temp, sizeof(temp));
+  temp &= ~field;
+  temp |= val;
+  writeReg(reg, (uint8_t*) &temp, sizeof(temp));
+}
+
+void DFRobot_Module::setPowerOn()
+{
+  sRegConfig_t    sField = {0}, sVal = {0};
+  sField.power = 0xff; sVal.power = ePowerOn;
+  writeRegBits(eRegPower, *(uint8_t*) &sField, *(uint8_t*) &sVal);
 }
 
 ```
@@ -319,9 +331,9 @@ void setPowerOn()
 
 class DFRobot_Module_I2C : public DFRobot_Module {
 public:
-  DFRobot_Module_I2C(Wire *pWire) { _pWire = pWire; }
+  DFRobot_Module_I2C(TwoWire *pWire) { _pWire = pWire; }
 
-  Wire    *_pWire;
+  TwoWire   *_pWire;
 }
 
 ```
